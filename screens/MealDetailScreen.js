@@ -1,51 +1,93 @@
-import { useLayoutEffect } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView } from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
 
 import IconButton from '../components/IconButton';
 import List from '../components/MealDetail/List';
 import Subtitle from '../components/MealDetail/Subtitle';
-import MealDetails from '../components/MealDetails';
-import { MEALS } from '../data/dummy-data';
+import { addFavorite, removeFavorite } from '../store/favorites';
+import { getMealById } from '../services/meals-api';
 
 function MealDetailScreen({ route, navigation }) {
-  const mealId = route.params.mealId;
+  const favoriteMealIds = useSelector((state) => state.favoriteMeals.ids);
+  const dispatch = useDispatch();
 
-  const selectedMeal = MEALS.find((meal) => meal.id === mealId);
+  const { mealId } = route.params;
 
-  function headerButtonPressHandler() {
-    console.log('Pressed!');
-  }
+  const mealIsFavorite = favoriteMealIds.includes(mealId);
+
+  const [meal, setMeal] = useState(null);
+
+  const changeFavoriteStatusHandler = useCallback(() => {
+    if (mealIsFavorite) {
+      dispatch(removeFavorite({ id: mealId }));
+    } else {
+      dispatch(addFavorite({ id: mealId }));
+    }
+  }, [dispatch, mealId, mealIsFavorite]);
+
+  useEffect(() => {
+    async function fetchMeal() {
+      const data = await getMealById(mealId);
+      setMeal(data);
+    }
+    fetchMeal();
+  }, [mealId]);
+
 
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => {
         return (
           <IconButton
-            icon="star"
+            icon={mealIsFavorite ? 'star' : 'star-outline'}
             color="white"
-            onPress={headerButtonPressHandler}
+            onPress={changeFavoriteStatusHandler}
           />
         );
       },
     });
-  }, [navigation, headerButtonPressHandler]);
+  }, [navigation, changeFavoriteStatusHandler]);
+
+const ingredients = [];
+if (meal) {
+  const seen = new Set();
+  for (let i = 1; i <= 20; i++) {
+    const ingredient = meal[`strIngredient${i}`]?.trim();
+    const measure = meal[`strMeasure${i}`]?.trim();
+
+    if (ingredient && ingredient.length > 0) {
+      const text = measure ? `${ingredient} - ${measure}` : ingredient;
+      if (!seen.has(text)) {
+        ingredients.push(text);
+        seen.add(text);
+      }
+    }
+  }
+}
+
+  console.log(meal);
+
+  if (!meal) {
+    return (
+      <View style={styles.rootContainer}>
+        <Text style={styles.title}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.rootContainer}>
-      <Image style={styles.image} source={{ uri: selectedMeal.imageUrl }} />
-      <Text style={styles.title}>{selectedMeal.title}</Text>
-      <MealDetails
-        duration={selectedMeal.duration}
-        complexity={selectedMeal.complexity}
-        affordability={selectedMeal.affordability}
-        textStyle={styles.detailText}
-      />
+      <Image style={styles.image} source={{ uri: meal.strMealThumb }} />
+      <Text style={styles.title}>{meal.strMeal}</Text>
       <View style={styles.listOuterContainer}>
         <View style={styles.listContainer}>
           <Subtitle>Ingredients</Subtitle>
-          <List data={selectedMeal.ingredients} />
+          <List data={ingredients} />
           <Subtitle>Steps</Subtitle>
-          <List data={selectedMeal.steps} />
+          <View style={styles.listItem}>
+            <Text style={styles.itemText}>{meal.strInstructions}</Text>
+          </View>
         </View>
       </View>
     </ScrollView>
@@ -76,6 +118,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContainer: {
-    width: '80%',
+    width: '90%',
+  },
+  listItem: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginVertical: 4,
+    marginHorizontal: 12,
+    backgroundColor: '#e2b497',
+  },
+  itemText: {
+    color: '#351401',
+    textAlign: 'center',
   },
 });
