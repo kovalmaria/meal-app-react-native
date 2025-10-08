@@ -66,8 +66,6 @@ if (meal) {
   }
 }
 
-  console.log(meal);
-
   if (!meal) {
     return (
       <View style={styles.rootContainer}>
